@@ -61,7 +61,8 @@ if not st.session_state.autentificat:
                 st.session_state.garaj_curent = user_input.strip()
                 st.rerun()
             else:
-                st.error("Nume garaj sau parolă incorectă!")st.stop()
+                st.error("Nume garaj sau parolă incorectă!")
+    st.stop()
 
 if "pagina_curenta" not in st.session_state:
     st.session_state.pagina_curenta = "🔍 Caută Cazuri / Istoric"
