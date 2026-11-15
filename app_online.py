@@ -61,9 +61,9 @@ if not st.session_state.autentificat:
                 st.session_state.garaj_curent = user_input.strip()
                 st.rerun()
             else:
-                st.error("Nume garaj sau parolă incorectă!")
-    st.stop()
-    if "pagina_curenta" not in st.session_state:
+                st.error("Nume garaj sau parolă incorectă!")st.stop()
+
+if "pagina_curenta" not in st.session_state:
     st.session_state.pagina_curenta = "🔍 Caută Cazuri / Istoric"
 if "mesaj_succes" not in st.session_state:
     st.session_state.mesaj_succes = None
@@ -233,3 +233,5 @@ elif st.session_state.pagina_curenta == "➕ Adaugă Caz Manual":
 
 elif st.session_state.pagina_curenta == "🛡️ Administrare Garaje":
     st.header("🛡️ Panou Administrare Garaje")
+    st.info("Pentru a adăuga un garaj nou sau a bloca accesul unuia existent, modifică secțiunea **[garaje]** din **Streamlit Cloud -> Settings -> Secrets**.")
+
