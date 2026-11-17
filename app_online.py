@@ -43,38 +43,32 @@ import json
 def incarca_date_vehicule():
     with zipfile.ZipFile("automobiles.csv.zip", "r") as z:
         fisiere = [f for f in z.namelist() if f.endswith(".csv") and not f.startswith("__MACOSX")]
-        tabele = {}
-        for f in fisiere:
-            nume_scurt = f.split("/")[-1].replace(".csv", "").lower()
-            with z.open(f) as csv_file:
-                tabele[nume_scurt] = pd.read_csv(csv_file, low_memory=False)
+        if not fisiere:
+            return pd.DataFrame()
+        with z.open(next(iter(fisiere))) as csv_file:
+            df = pd.read_csv(csv_file, low_memory=False)
 
-    if not tabele:
-        return pd.DataFrame()
+    # Extragem Marca și Modelul din coloana 'url' sau 'link' dacă există (ex: .../cars/audi-a4-...)
+    col_url = next((c for c in df.columns if "url" in c.lower() or "link" in c.lower()), None)
+    if col_url and "Marcă" not in df.columns:
+        def extrage_marca_model(u):
+            s = str(u)
+            if "/cars/" in s:
+                parte = s.split("/cars/")[-1].split(".html")[0].split("#")[0]
+                bucati = [b for b in parte.split("-") if b and not b.isdigit()]
+                if len(bucati) >= 2:
+                    return bucati[0].capitalize(), bucati[1].capitalize()
+                elif len(bucati) == 1:
+                    return bucati[0].capitalize(), "General"
+            return "Necunoscut", "Necunoscut"
 
-    df_auto = max(tabele.values(), key=len)
+        rez = df[col_url].apply(extrage_marca_model)
+        df["Marcă"] = [r[0] for r in rez]
+        df["Model"] = [r[1] for r in rez]
 
-    # Căutăm automat tabelul de modele (indiferent dacă e 'model' sau 'models')
-    cheie_model = next((k for k in tabele if "model" in k and tabele[k] is not df_auto), None)
-    if cheie_model:
-        df_m = tabele[cheie_model]
-        col_id_m = "id" if "id" in df_m.columns else next(iter(df_m.columns))
-        col_nume_m = "name" if "name" in df_m.columns else next((c for c in df_m.columns if "name" in c.lower() or "title" in c.lower()), col_id_m)
-        col_leg_m = next((c for c in df_auto.columns if "model" in c.lower() and "id" in c.lower()), None)
-        if col_leg_m:
-            df_auto = pd.merge(df_auto, df_m.rename(columns={col_id_m: col_leg_m, col_nume_m: "Model"}), on=col_leg_m, how="left")
+    return df
 
-    # Căutăm automat tabelul de mărci (indiferent dacă e 'brand', 'brands', 'make' sau 'makes')
-    cheie_marca = next((k for k in tabele if ("brand" in k or "make" in k) and tabele[k] is not df_auto), None)
-    if cheie_marca:
-        df_b = tabele[cheie_marca]
-        col_id_b = "id" if "id" in df_b.columns else next(iter(df_b.columns))
-        col_nume_b = "name" if "name" in df_b.columns else next((c for c in df_b.columns if "name" in c.lower() or "title" in c.lower()), col_id_b)
-        col_leg_b = next((c for c in df_auto.columns if ("brand" in c.lower() or "make" in c.lower()) and "id" in c.lower()), None)
-        if col_leg_b:
-            df_auto = pd.merge(df_auto, df_b[[col_id_b, col_nume_b]].rename(columns={col_id_b: col_leg_b, col_nume_b: "Marcă"}), on=col_leg_b, how="left")
 
-    return df_auto
 
         
     
