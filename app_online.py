@@ -59,7 +59,7 @@ def incarca_date_vehicule():
                 df_rez = pd.merge(tabel_specs, df_rez[["model_id", "Marcă", "Model"]], on="model_id", how="left")
             return df_rez
 
-    return pd.concat(tabele.values(), ignore_index=True) if tabele else pd.DataFrame()
+        return pd.concat(tabele.values(), ignore_index=True) if tabele else pd.DataFrame()
 
     except Exception:
         return pd.DataFrame()
