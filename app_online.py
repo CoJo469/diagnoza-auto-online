@@ -78,8 +78,7 @@ def incarca_date_vehicule():
     return df_auto
 
         
-    except Exception:
-        return pd.DataFrame()
+    
 
 
 
