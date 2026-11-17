@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 import os
 import re
 from datetime import datetime
@@ -42,6 +43,13 @@ st.markdown("""
 def init_supabase() -> Client:
     return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 
+@st.cache_data
+def incarca_date_vehicule():
+    try:
+        return pd.read_csv("vehicles.csv")
+    except Exception:
+        return pd.DataFrame()
+
 supabase = init_supabase()
 
 if "autentificat" not in st.session_state:
@@ -84,12 +92,17 @@ def incarca_fisier_cloud(fisier, folder):
 st.title(f"🔧 Diagnoză Auto PRO — {st.session_state.garaj_curent}")
 
 admin_user = st.secrets.get("ADMIN_USER", "")
-optiuni_meniu = ["🔍 Caută Cazuri / Istoric", "📄 Import Raport PDF", "➕ Adaugă Caz Manual"]
+optiuni_meniu = [
+    "🔍 Caută Cazuri / Istoric",
+    "📄 Import Raport PDF",
+    "➕ Adaugă Caz Manual",
+    "🚗 Catalog Vehicule (BD)"
+]
 if st.session_state.garaj_curent == admin_user:
     optiuni_meniu.append("🛡️ Administrare Garaje")
 
 if st.session_state.pagina_curenta not in optiuni_meniu:
-    st.session_state.pagina_curenta = optiuni_meniu[0]
+    st.session_state.pagina_curenta = optiuni_meniu
 
 meniu_ales = st.sidebar.radio("📌 MENIU PRINCIPAL", optiuni_meniu, index=optiuni_meniu.index(st.session_state.pagina_curenta))
 if meniu_ales != st.session_state.pagina_curenta:
@@ -122,7 +135,7 @@ if st.session_state.pagina_curenta == "🔍 Caută Cazuri / Istoric":
 
     st.write("")
     with st.form("formular_cautare"):
-        col_c1, col_c2, col_c3 = st.columns([2, 2, 1])
+        col_c1, col_c2, col_c3 = st.columns()
         with col_c1:
             cautare_cod = st.text_input("Cod de eroare (DTC) / Cod Motor / Marcă", placeholder="ex: P0299, CFFB")
         with col_c2:
@@ -150,11 +163,11 @@ if st.session_state.pagina_curenta == "🔍 Caută Cazuri / Istoric":
         culoare = "🟢" if row.get("status") == "Rezolvat" else "🟡"
         titlu = f"{culoare} [{row.get('coduri_eroare')}] {row.get('marca_model')} ({row.get('an_fabricatie')}) — Motor: {row.get('cod_motor')} | Garaj: {row.get('garaj')} | {row.get('data_ora')}"
         with st.expander(titlu):
-            col_a, col_b = st.columns([2, 1])
+            col_a, col_b = st.columns()
             with col_a:
                 st.markdown(f"**Status:** `{row.get('status')}` | **Adăugat de:** `{row.get('garaj')}`")
                 st.markdown(f"**Simptome:** {row.get('simptome') or 'Nespecificat'}")
-                st.info(f"**Investigații făcute:**\n\n{row.get('investigatii')}")
+                st.info(f"**Investigații făcute:**\n\n{row.get('investigatii') or 'Nespecificat'}")
                 st.success(f"**Rezolvare:**\n\n{row.get('rezolvare') or 'Încă nu a fost adăugată o rezolvare.'}")
                 if row.get("url_pdf"):
                     st.link_button("📄 Deschide / Descarcă Raportul PDF", row["url_pdf"])
@@ -179,60 +192,3 @@ elif st.session_state.pagina_curenta == "📄 Import Raport PDF":
                 coduri_eroare = st.text_input("Coduri DTC (extrase automat) *", value=coduri_extrase)
                 status = st.selectbox("Status caz", ["În investigație", "Rezolvat", "Așteaptă piese"])
             simptome = st.text_area("Simptome reclamate")
-            investigatii = st.text_area("Investigații și măsurători făcute *", value="Scanare inițială efectuată (raport PDF atașat).")
-            rezolvare = st.text_area("Concluzie și Rezolvare finală")
-            poza = st.file_uploader("Atașează o poză (opțional)", type=["jpg", "jpeg", "png"])
-            if st.form_submit_button("💾 Salvează Cazul și Raportul PDF", use_container_width=True):
-                if not marca_model or not cod_motor or not investigatii:
-                    st.error("Completează Marcă/Model, Cod Motor și Investigații!")
-                else:
-                    url_pdf = incarca_fisier_cloud(pdf_incarcat, "pdf")
-                    url_poza = incarca_fisier_cloud(poza, "poze") if poza else ""
-                    supabase.table("cazuri").insert({
-                        "data_ora": datetime.now().strftime("%d-%m-%Y %H:%M"),
-                        "garaj": st.session_state.garaj_curent,
-                        "marca_model": marca_model, "an_fabricatie": an_fabricatie,
-                        "cod_motor": cod_motor.upper(), "coduri_eroare": coduri_eroare.upper(),
-                        "simptome": simptome, "investigatii": investigatii, "rezolvare": rezolvare,
-                        "status": status, "url_poza": url_poza, "url_pdf": url_pdf
-                    }).execute()
-                    st.session_state.mesaj_succes = f"Cazul pentru {marca_model} a fost salvat în cloud!"
-                    st.session_state.pagina_curenta = "🔍 Caută Cazuri / Istoric"
-                    st.rerun()
-
-elif st.session_state.pagina_curenta == "➕ Adaugă Caz Manual":
-    st.header("Înregistrare investigație manuală")
-    with st.form("formular_manual", clear_on_submit=True):
-        col1, col2 = st.columns(2)
-        with col1:
-            marca_model = st.text_input("Marcă și Model *")
-            an_fabricatie = st.number_input("An fabricație", min_value=1980, max_value=2030, value=2015)
-        with col2:
-            cod_motor = st.text_input("Cod Motor *")
-            coduri_eroare = st.text_input("Coduri de eroare (DTC) *")
-            status = st.selectbox("Status caz", ["Rezolvat", "În investigație", "Așteaptă piese"])
-        simptome = st.text_area("Simptome reclamate")
-        investigatii = st.text_area("Investigații și măsurători făcute *")
-        rezolvare = st.text_area("Concluzie și Rezolvare finală")
-        poza = st.file_uploader("Atașează o poză (opțional)", type=["jpg", "jpeg", "png"])
-        if st.form_submit_button("💾 Salvează Cazul", use_container_width=True):
-            if not marca_model or not cod_motor or not coduri_eroare or not investigatii:
-                st.error("Completează câmpurile obligatorii marcate cu *!")
-            else:
-                url_poza = incarca_fisier_cloud(poza, "poze") if poza else ""
-                supabase.table("cazuri").insert({
-                    "data_ora": datetime.now().strftime("%d-%m-%Y %H:%M"),
-                    "garaj": st.session_state.garaj_curent,
-                    "marca_model": marca_model, "an_fabricatie": an_fabricatie,
-                    "cod_motor": cod_motor.upper(), "coduri_eroare": coduri_eroare.upper(),
-                    "simptome": simptome, "investigatii": investigatii, "rezolvare": rezolvare,
-                    "status": status, "url_poza": url_poza, "url_pdf": ""
-                }).execute()
-                st.session_state.mesaj_succes = f"Cazul pentru {marca_model} a fost salvat în cloud!"
-                st.session_state.pagina_curenta = "🔍 Caută Cazuri / Istoric"
-                st.rerun()
-
-elif st.session_state.pagina_curenta == "🛡️ Administrare Garaje":
-    st.header("🛡️ Panou Administrare Garaje")
-    st.info("Pentru a adăuga un garaj nou sau a bloca accesul unuia existent, modifică secțiunea **[garaje]** din **Streamlit Cloud -> Settings -> Secrets**.")
-
