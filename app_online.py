@@ -50,9 +50,10 @@ def incarca_date_vehicule():
                 with z.open(f) as csv_file:
                     tabele[nume_scurt] = pd.read_csv(csv_file, low_memory=False)
 
-        df_auto = tabele.get("automobiles", pd.DataFrame())
-        if df_auto.empty:
+        if not tabele:
             return pd.DataFrame()
+        df_auto = max(tabele.values(), key=len)
+
 
         if "brands" in tabele and "brand_id" in df_auto.columns:
             df_b = tabele["brands"].rename(columns={"id": "brand_id", "name": "Marcă"})
