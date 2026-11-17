@@ -266,47 +266,50 @@ elif st.session_state.pagina_curenta == "➕ Caz Manual":
                 st.rerun()
 
 elif st.session_state.pagina_curenta == "🚗 Catalog Vehicule (BD)":
-    st.header("🚗 Catalog Vehicule — Bază de date la îndemână")
+    st.header("🚗 Catalog Tehnic Vehicule — Specificații Complete")
     df_veh = incarca_date_vehicule()
     if df_veh.empty:
-        st.error("Nu s-a găsit fișierul `vehicles.csv` în depozit.")
+        st.error("Nu s-au putut încărca datele din `automobiles.csv.zip`.")
     else:
         coloane = list(df_veh.columns)
-        col_tip = next((c for c in coloane if c.lower() in ["kind", "type", "category", "vehicle_type"]), None)
-        col_marca = next((c for c in coloane if c.lower() in ["make", "brand", "manufacturer", "marca"]), coloane[0])
-        col_model = next((c for c in coloane if c.lower() in ["model", "name", "model_name"]), coloane[1] if len(coloane) > 1 else coloane[0])
-
-        etichete_tip = {
-            "car": "Autoturisme", "van": "Utilitare / Dube",
-            "motorcycle": "Motociclete", "truck": "Camioane",
-            "bus": "Autobuze", "moped": "Mopede"
-        }
+        col_marca = "Marcă" if "Marcă" in coloane else next((c for c in coloane if "make" in c.lower() or "brand" in c.lower()), coloane)
+        col_model = "Model" if "Model" in coloane else next((c for c in coloane if "model" in c.lower()), coloane if len(coloane) > 1 else coloane)
 
         df_filtrat = df_veh.copy()
         col_f1, col_f2, col_f3 = st.columns(3)
 
         with col_f1:
-            if col_tip:
-                tipuri_disponibile = sorted(df_veh[col_tip].dropna().astype(str).unique().tolist())
-                tip_ales = st.selectbox("Categorie vehicul", ["Toate"] + tipuri_disponibile, format_func=lambda x: etichete_tip.get(x, x) if x != "Toate" else "Toate categoriile")
-                if tip_ales != "Toate":
-                    df_filtrat = df_filtrat[df_filtrat[col_tip].astype(str) == tip_ales]
-            else:
-                st.info(f"Total coloane: {len(coloane)}")
-
-        with col_f2:
             marci_disponibile = ["Toate mărcile"] + sorted(df_filtrat[col_marca].dropna().astype(str).unique().tolist())
-            marca_aleasa = st.selectbox("Marcă", marci_disponibile)
+            marca_aleasa = st.selectbox("1. Alege Marca", marci_disponibile)
             if marca_aleasa != "Toate mărcile":
                 df_filtrat = df_filtrat[df_filtrat[col_marca].astype(str) == marca_aleasa]
 
-        with col_f3:
-            cautare_model = st.text_input("Caută model rapid", placeholder="ex: Passat, Logan, X5")
-            if cautare_model.strip():
-                df_filtrat = df_filtrat[df_filtrat[col_model].astype(str).str.contains(cautare_model.strip(), case=False, na=False)]
+        with col_f2:
+            modele_disponibile = ["Toate modelele"] + sorted(df_filtrat[col_model].dropna().astype(str).unique().tolist())
+            model_ales = st.selectbox("2. Alege Modelul", modele_disponibile)
+            if model_ales != "Toate modelele":
+                df_filtrat = df_filtrat[df_filtrat[col_model].astype(str) == model_ales]
 
-        st.markdown(f"**Vehicule găsite:** `{len(df_filtrat)}` înregistrări")
-        st.dataframe(df_filtrat, use_container_width=True, hide_index=True)
+        with col_f3:
+            cautare_motor = st.text_input("3. Caută motor / cilindree / an", placeholder="ex: 2.0 TDI, 110 kw, 2015")
+            if cautare_motor.strip():
+                mask = df_filtrat.astype(str).apply(lambda x: x.str.contains(cautare_motor.strip(), case=False, na=False)).any(axis=1)
+                df_filtrat = df_filtrat[mask]
+
+        coloane_ordonate = [col_marca, col_model] + [c for c in coloane if c not in [col_marca, col_model, "id", "brand_id", "model_id", "url"]]
+        df_afisat = df_filtrat[coloane_ordonate]
+
+        st.markdown(f"**Motorizări și versiuni găsite:** `{len(df_afisat)}` înregistrări")
+        st.dataframe(df_afisat.head(500), use_container_width=True, hide_index=True)
+
+        if len(df_afisat) == 1 or (marca_aleasa != "Toate mărcile" and model_ales != "Toate modelele" and len(df_afisat) <= 15):
+            st.subheader("📋 Fișă tehnică detaliată")
+            for _, rand in df_afisat.iterrows():
+                titlu_versiune = f"🔧 {rand[col_marca]} {rand[col_model]} — {rand.iloc if len(rand) > 2 else ''}"
+                with st.expander(titlu_versiune):
+                    detalii_curate = {k: v for k, v in rand.items() if pd.notna(v) and str(v).strip() != ""}
+                    for k, v in detalii_curate.items():
+                        st.markdown(f"**{k}:** `{v}`")
 
 elif st.session_state.pagina_curenta == "🛡️ Garaje":
     st.header("🛡️ Panou Administrare Garaje")
