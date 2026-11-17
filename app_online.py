@@ -54,26 +54,25 @@ def incarca_date_vehicule():
 
     df_auto = max(tabele.values(), key=len)
 
-    # Legăm Marca și Modelul indiferent cum se numesc coloanele de legătură
-    if "brands" in tabele:
-        df_b = tabele["brands"]
-        col_id_b = "id" if "id" in df_b.columns else df_b.columns
-        col_nume_b = "name" if "name" in df_b.columns else df_b.columns[1]
-        if "brand_id" in df_auto.columns:
-            df_auto = pd.merge(df_auto, df_b[[col_id_b, col_nume_b]].rename(columns={col_id_b: "brand_id", col_nume_b: "Marcă"}), on="brand_id", how="left")
+    # Căutăm automat tabelul de modele (indiferent dacă e 'model' sau 'models')
+    cheie_model = next((k for k in tabele if "model" in k and tabele[k] is not df_auto), None)
+    if cheie_model:
+        df_m = tabele[cheie_model]
+        col_id_m = "id" if "id" in df_m.columns else next(iter(df_m.columns))
+        col_nume_m = "name" if "name" in df_m.columns else next((c for c in df_m.columns if "name" in c.lower() or "title" in c.lower()), col_id_m)
+        col_leg_m = next((c for c in df_auto.columns if "model" in c.lower() and "id" in c.lower()), None)
+        if col_leg_m:
+            df_auto = pd.merge(df_auto, df_m.rename(columns={col_id_m: col_leg_m, col_nume_m: "Model"}), on=col_leg_m, how="left")
 
-    if "models" in tabele:
-        df_m = tabele["models"]
-        col_id_m = "id" if "id" in df_m.columns else df_m.columns
-        col_nume_m = "name" if "name" in df_m.columns else df_m.columns[1]
-        if "model_id" in df_auto.columns:
-            df_auto = pd.merge(df_auto, df_m[[col_id_m, col_nume_m]].rename(columns={col_id_m: "model_id", col_nume_m: "Model"}), on="model_id", how="left")
-            if "Marcă" not in df_auto.columns and "brand_id" in df_m.columns and "brands" in tabele:
-                df_b = tabele["brands"]
-                col_id_b = "id" if "id" in df_b.columns else df_b.columns
-                col_nume_b = "name" if "name" in df_b.columns else df_b.columns[1]
-                df_m_b = pd.merge(df_m[[col_id_m, "brand_id"]], df_b[[col_id_b, col_nume_b]].rename(columns={col_id_b: "brand_id", col_nume_b: "Marcă"}), on="brand_id", how="left")
-                df_auto = pd.merge(df_auto, df_m_b[[col_id_m, "Marcă"]].rename(columns={col_id_m: "model_id"}), on="model_id", how="left")
+    # Căutăm automat tabelul de mărci (indiferent dacă e 'brand', 'brands', 'make' sau 'makes')
+    cheie_marca = next((k for k in tabele if ("brand" in k or "make" in k) and tabele[k] is not df_auto), None)
+    if cheie_marca:
+        df_b = tabele[cheie_marca]
+        col_id_b = "id" if "id" in df_b.columns else next(iter(df_b.columns))
+        col_nume_b = "name" if "name" in df_b.columns else next((c for c in df_b.columns if "name" in c.lower() or "title" in c.lower()), col_id_b)
+        col_leg_b = next((c for c in df_auto.columns if ("brand" in c.lower() or "make" in c.lower()) and "id" in c.lower()), None)
+        if col_leg_b:
+            df_auto = pd.merge(df_auto, df_b[[col_id_b, col_nume_b]].rename(columns={col_id_b: col_leg_b, col_nume_b: "Marcă"}), on=col_leg_b, how="left")
 
     return df_auto
 
