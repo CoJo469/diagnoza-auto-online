@@ -37,6 +37,7 @@ def init_supabase() -> Client:
     return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 
 import zipfile
+import json
 
 @st.cache_data
 def incarca_date_vehicule():
@@ -48,21 +49,43 @@ def incarca_date_vehicule():
                 nume_scurt = f.split("/")[-1].replace(".csv", "").lower()
                 with z.open(f) as csv_file:
                     tabele[nume_scurt] = pd.read_csv(csv_file, low_memory=False)
-        
-        if "brands" in tabele and "models" in tabele:
+
+        df_auto = tabele.get("automobiles", pd.DataFrame())
+        if df_auto.empty:
+            return pd.DataFrame()
+
+        if "brands" in tabele and "brand_id" in df_auto.columns:
             df_b = tabele["brands"].rename(columns={"id": "brand_id", "name": "Marcă"})
+            df_auto = pd.merge(df_auto, df_b[["brand_id", "Marcă"]], on="brand_id", how="left")
+
+        if "models" in tabele and "model_id" in df_auto.columns:
             df_m = tabele["models"].rename(columns={"id": "model_id", "name": "Model"})
-            df_rez = pd.merge(df_m, df_b[["brand_id", "Marcă"]], on="brand_id", how="left")
-            
-            tabel_specs = next((tabele[k] for k in ["options", "engines", "specs", "trims"] if k in tabele), None)
-            if tabel_specs is not None:
-                df_rez = pd.merge(tabel_specs, df_rez[["model_id", "Marcă", "Model"]], on="model_id", how="left")
-            return df_rez
+            df_auto = pd.merge(df_auto, df_m[["model_id", "Model"]], on="model_id", how="left")
 
-        return pd.concat(tabele.values(), ignore_index=True) if tabele else pd.DataFrame()
+        if "engine_specs" in df_auto.columns:
+            def parse_specs(val):
+                if pd.isna(val) or not str(val).strip().startswith("{"):
+                    return {}
+                try:
+                    d = json.loads(str(val))
+                    rez = {}
+                    for sectiune, continut in d.items():
+                        if isinstance(continut, dict):
+                            for k, v in continut.items():
+                                rez[k] = v
+                        else:
+                            rez[sectiune] = continut
+                    return rez
+                except Exception:
+                    return {}
 
+            specs_df = pd.json_normalize(df_auto["engine_specs"].apply(parse_specs))
+            df_auto = pd.concat([df_auto.drop(columns=["engine_specs", "photos", "url"], errors="ignore"), specs_df], axis=1)
+
+        return df_auto
     except Exception:
         return pd.DataFrame()
+
 
 
 supabase = init_supabase()
@@ -299,8 +322,9 @@ elif st.session_state.pagina_curenta == "🚗 Catalog Vehicule (BD)":
                 mask = df_filtrat.astype(str).apply(lambda x: x.str.contains(cautare_motor.strip(), case=False, na=False)).any(axis=1)
                 df_filtrat = df_filtrat[mask]
 
-        coloane_ordonate = [col_marca, col_model] + [c for c in coloane if c not in [col_marca, col_model, "id", "brand_id", "model_id", "url"]]
-        df_afisat = df_filtrat[coloane_ordonate]
+             prioritare = [c for c in ["Marcă", "Model", "engine_name", "name"] if c in coloane]
+           coloane_ordonate = prioritare + [c for c in coloane if c not in prioritare + ["id", "brand_id", "model_id", "url", "photos", "other_id", "automobile_id", "created_at", "updated_at"]]
+           df_afisat = df_filtrat[coloane_ordonate]
 
         st.markdown(f"**Motorizări și versiuni găsite:** `{len(df_afisat)}` înregistrări")
         st.dataframe(df_afisat.head(500), use_container_width=True, hide_index=True)
