@@ -38,26 +38,27 @@ def init_supabase() -> Client:
 
 @st.cache_data
 def incarca_date_vehicule():
-    baza_url = "https://githubusercontent.com"
-    df_auto = pd.read_csv(baza_url + "automobiles.csv.zip", compression="zip", low_memory=False)
-    df_models = pd.read_csv(baza_url + "models.csv.zip", compression="zip", low_memory=False)
-    df_brands = pd.read_csv(baza_url + "brands.csv.zip", compression="zip", low_memory=False)
+    df = pd.read_csv("automobiles.csv.zip", low_memory=False)
 
-    df_models = pd.merge(
-        df_models,
-        df_brands[["id", "name"]].rename(columns={"id": "brand_id", "name": "Marcă"}),
-        on="brand_id",
-        how="left"
-    )
+    if "url" in df.columns:
+        def extrage_marca_model(u):
+            s = str(u)
+            if "/cars/" in s:
+                slug = s.split("/cars/")[-1].split(".html")
+                cuvinte = [c for c in slug.split("-") if c and not c.isdigit()]
+                if len(cuvinte) >= 2:
+                    return cuvinte.capitalize(), cuvinte.capitalize()
+                elif len(cuvinte) == 1:
+                    return cuvinte.capitalize(), "General"
+            return "Altele", "Altele"
 
-    df_auto = pd.merge(
-        df_auto,
-        df_models[["id", "name", "Marcă"]].rename(columns={"id": "model_id", "name": "Model"}),
-        on="model_id",
-        how="left"
-    )
+        rez = df["url"].apply(extrage_marca_model)
+        df["Marcă"] = [r for r in rez]
+        df["Model"] = [r for r in rez]
 
-    return df_auto
+    return df
+
+
 
 
 
