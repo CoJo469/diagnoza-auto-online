@@ -72,7 +72,7 @@ if not st.session_state.autentificat:
                 st.error("Nume garaj sau parolă incorectă!")
     st.stop()
 
-if "pagina_curenta" not in st.session_state:
+if "pagina_curenta" not in st.session_state or not isinstance(st.session_state.pagina_curenta, str):
     st.session_state.pagina_curenta = "🔍 Caută Cazuri / Istoric"
 if "mesaj_succes" not in st.session_state:
     st.session_state.mesaj_succes = None
@@ -102,7 +102,7 @@ if st.session_state.garaj_curent == admin_user:
     optiuni_meniu.append("🛡️ Administrare Garaje")
 
 if st.session_state.pagina_curenta not in optiuni_meniu:
-    st.session_state.pagina_curenta = optiuni_meniu[0]
+    st.session_state.pagina_curenta = "🔍 Caută Cazuri / Istoric"
 
 meniu_ales = st.sidebar.radio("📌 MENIU PRINCIPAL", optiuni_meniu, index=optiuni_meniu.index(st.session_state.pagina_curenta))
 if meniu_ales != st.session_state.pagina_curenta:
