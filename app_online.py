@@ -41,32 +41,44 @@ import json
 
 @st.cache_data
 def incarca_date_vehicule():
-    try:
-        df = pd.read_csv("automobiles.csv.zip", low_memory=False)
-    except Exception:
-        with zipfile.ZipFile("automobiles.csv.zip", "r") as z:
-            fisiere = [f for f in z.namelist() if f.endswith(".csv") and not f.startswith("__MACOSX")]
-            with z.open(next(iter(fisiere))) as csv_file:
-                df = pd.read_csv(csv_file, low_memory=False)
+    with zipfile.ZipFile("automobiles.csv.zip", "r") as z:
+        fisiere = [f for f in z.namelist() if f.endswith(".csv") and not f.startswith("__MACOSX")]
+        lista_df = []
+        for f in fisiere:
+            with z.open(f) as csv_file:
+                df_temp = pd.read_csv(csv_file, low_memory=False)
+                if len(df_temp) > 50:
+                    lista_df.append(df_temp)
 
-    col_url = next((c for c in df.columns if "url" in c.lower() or "link" in c.lower()), None)
-    if col_url and "Marcă" not in df.columns:
-        def extrage_marca_model(u):
-            s = str(u)
-            if "/cars/" in s:
-                parte = s.split("/cars/")[-1].split(".html").split("#")
-                bucati = [b for b in parte.split("-") if b and not b.isdigit()]
-                if len(bucati) >= 2:
-                    return bucati.capitalize(), bucati.capitalize()
-                elif len(bucati) == 1:
-                    return bucati.capitalize(), "General"
-            return "Necunoscut", "Necunoscut"
+    if not lista_df:
+        return pd.DataFrame()
 
-        rez = df[col_url].apply(extrage_marca_model)
-        df["Marcă"] = [r for r in rez]
-        df["Model"] = [r for r in rez]
+    # Sortăm tabelele după numărul de rânduri: [Mărci (124), Modele (7207), Motorizări (30066)]
+    lista_sortata = sorted(lista_df, key=len)
+    df_auto = lista_sortata[-1]
 
-    return df
+    if len(lista_sortata) >= 3:
+        df_brands = lista_sortata[0]
+        df_models = lista_sortata[1]
+
+        if "id" in df_brands.columns and "name" in df_brands.columns and "brand_id" in df_models.columns:
+            df_models = pd.merge(
+                df_models,
+                df_brands[["id", "name"]].rename(columns={"id": "brand_id", "name": "Marcă"}),
+                on="brand_id",
+                how="left"
+            )
+
+        if "id" in df_models.columns and "name" in df_models.columns and "model_id" in df_auto.columns:
+            cols_m = ["id", "name", "Marcă"] if "Marcă" in df_models.columns else ["id", "name"]
+            df_auto = pd.merge(
+                df_auto,
+                df_models[cols_m].rename(columns={"id": "model_id", "name": "Model"}),
+                on="model_id",
+                how="left"
+            )
+
+    return df_auto
 
 
 
