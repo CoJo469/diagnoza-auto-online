@@ -322,9 +322,9 @@ elif st.session_state.pagina_curenta == "🚗 Catalog Vehicule (BD)":
                 mask = df_filtrat.astype(str).apply(lambda x: x.str.contains(cautare_motor.strip(), case=False, na=False)).any(axis=1)
                 df_filtrat = df_filtrat[mask]
 
-             prioritare = [c for c in ["Marcă", "Model", "engine_name", "name"] if c in coloane]
-           coloane_ordonate = prioritare + [c for c in coloane if c not in prioritare + ["id", "brand_id", "model_id", "url", "photos", "other_id", "automobile_id", "created_at", "updated_at"]]
-           df_afisat = df_filtrat[coloane_ordonate]
+        prioritare = [c for c in ["Marcă", "Model", "engine_name", "name"] if c in coloane]
+        coloane_ordonate = prioritare + [c for c in coloane if c not in prioritare + ["id", "brand_id", "model_id", "url", "photos", "other_id", "automobile_id", "created_at", "updated_at"]]
+        df_afisat = df_filtrat[coloane_ordonate]
 
         st.markdown(f"**Motorizări și versiuni găsite:** `{len(df_afisat)}` înregistrări")
         st.dataframe(df_afisat.head(500), use_container_width=True, hide_index=True)
