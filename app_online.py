@@ -102,7 +102,7 @@ if st.session_state.garaj_curent == admin_user:
     optiuni_meniu.append("🛡️ Administrare Garaje")
 
 if st.session_state.pagina_curenta not in optiuni_meniu:
-    st.session_state.pagina_curenta = optiuni_meniu
+    st.session_state.pagina_curenta = optiuni_meniu[0]
 
 meniu_ales = st.sidebar.radio("📌 MENIU PRINCIPAL", optiuni_meniu, index=optiuni_meniu.index(st.session_state.pagina_curenta))
 if meniu_ales != st.session_state.pagina_curenta:
@@ -135,7 +135,7 @@ if st.session_state.pagina_curenta == "🔍 Caută Cazuri / Istoric":
 
     st.write("")
     with st.form("formular_cautare"):
-        col_c1, col_c2, col_c3 = st.columns()
+        col_c1, col_c2, col_c3 = st.columns(3)
         with col_c1:
             cautare_cod = st.text_input("Cod de eroare (DTC) / Cod Motor / Marcă", placeholder="ex: P0299, CFFB")
         with col_c2:
@@ -163,7 +163,7 @@ if st.session_state.pagina_curenta == "🔍 Caută Cazuri / Istoric":
         culoare = "🟢" if row.get("status") == "Rezolvat" else "🟡"
         titlu = f"{culoare} [{row.get('coduri_eroare')}] {row.get('marca_model')} ({row.get('an_fabricatie')}) — Motor: {row.get('cod_motor')} | Garaj: {row.get('garaj')} | {row.get('data_ora')}"
         with st.expander(titlu):
-            col_a, col_b = st.columns()
+            col_a, col_b = st.columns(2)
             with col_a:
                 st.markdown(f"**Status:** `{row.get('status')}` | **Adăugat de:** `{row.get('garaj')}`")
                 st.markdown(f"**Simptome:** {row.get('simptome') or 'Nespecificat'}")
