@@ -41,32 +41,34 @@ import json
 
 @st.cache_data
 def incarca_date_vehicule():
-    with zipfile.ZipFile("automobiles.csv.zip", "r") as z:
-        fisiere = [f for f in z.namelist() if f.endswith(".csv") and not f.startswith("__MACOSX")]
-        if not fisiere:
-            return pd.DataFrame()
-        with z.open(next(iter(fisiere))) as csv_file:
-            df = pd.read_csv(csv_file, low_memory=False)
+    try:
+        df = pd.read_csv("automobiles.csv.zip", low_memory=False)
+    except Exception:
+        with zipfile.ZipFile("automobiles.csv.zip", "r") as z:
+            fisiere = [f for f in z.namelist() if f.endswith(".csv") and not f.startswith("__MACOSX")]
+            with z.open(next(iter(fisiere))) as csv_file:
+                df = pd.read_csv(csv_file, low_memory=False)
 
-    # Extragem Marca și Modelul din coloana 'url' sau 'link' dacă există (ex: .../cars/audi-a4-...)
     col_url = next((c for c in df.columns if "url" in c.lower() or "link" in c.lower()), None)
     if col_url and "Marcă" not in df.columns:
         def extrage_marca_model(u):
             s = str(u)
             if "/cars/" in s:
-                parte = s.split("/cars/")[-1].split(".html")[0].split("#")[0]
+                parte = s.split("/cars/")[-1].split(".html").split("#")
                 bucati = [b for b in parte.split("-") if b and not b.isdigit()]
                 if len(bucati) >= 2:
-                    return bucati[0].capitalize(), bucati[1].capitalize()
+                    return bucati.capitalize(), bucati.capitalize()
                 elif len(bucati) == 1:
-                    return bucati[0].capitalize(), "General"
+                    return bucati.capitalize(), "General"
             return "Necunoscut", "Necunoscut"
 
         rez = df[col_url].apply(extrage_marca_model)
-        df["Marcă"] = [r[0] for r in rez]
-        df["Model"] = [r[1] for r in rez]
+        df["Marcă"] = [r for r in rez]
+        df["Model"] = [r for r in rez]
 
     return df
+
+
 
 
 
