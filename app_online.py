@@ -11,13 +11,6 @@ st.set_page_config(page_title="Diagnoză Auto PRO Online", page_icon="🔧", lay
 st.markdown("""
 <style>
     .stApp { background-color: #0E1117; color: #FFFFFF; }
-    [data-testid="stSidebar"] { background-color: #161B22; border-right: 1px solid #30363D; }
-    [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] label, [data-testid="stSidebar"] div[role="radiogroup"] label div p {
-        color: #FFFFFF !important;
-        font-style: italic !important;
-        font-weight: normal !important;
-        font-size: 16px !important;
-    }
     h1, h2, h3 { color: #58A6FF !important; font-family: 'Segoe UI', sans-serif; }
     [data-testid="stWidgetLabel"] p, [data-testid="stWidgetLabel"] label, .stTextInput label p, .stTextArea label p, .stNumberInput label p, .stSelectbox label p, .stFileUploader label p {
         color: #58A6FF !important;
@@ -33,7 +26,7 @@ st.markdown("""
     }
     .streamlit-expanderHeader { background-color: #161B22 !important; border: 1px solid #30363D !important; border-radius: 8px !important; color: #FFFFFF !important; }
     .streamlit-expanderContent { background-color: #12161C !important; border: 1px solid #30363D !important; border-top: none !important; }
-    .metric-card { background-color: #161B22; border: 1px solid #30363D; border-left: 4px solid #FF6B00; border-radius: 8px; padding: 15px; text-align: center; }
+    .metric-card { background-color: #161B22; border: 1px solid #30363D; border-left: 4px solid #FF6B00; border-radius: 8px; padding: 15px; text-align: center; margin-bottom: 10px; }
     .metric-value { font-size: 28px; font-weight: bold; color: #FFFFFF; }
     .metric-label { font-size: 14px; color: #58A6FF; font-style: italic; }
 </style>
@@ -73,7 +66,7 @@ if not st.session_state.autentificat:
     st.stop()
 
 if "pagina_curenta" not in st.session_state or not isinstance(st.session_state.pagina_curenta, str):
-    st.session_state.pagina_curenta = "🔍 Caută Cazuri / Istoric"
+    st.session_state.pagina_curenta = "🔍 Caută Cazuri"
 if "mesaj_succes" not in st.session_state:
     st.session_state.mesaj_succes = None
 
@@ -89,37 +82,43 @@ def incarca_fisier_cloud(fisier, folder):
     supabase.storage.from_("atasamente").upload(cale, fisier.getvalue(), {"content-type": fisier.type})
     return supabase.storage.from_("atasamente").get_public_url(cale)
 
-st.title(f"🔧 Diagnoză Auto PRO — {st.session_state.garaj_curent}")
+# Antet și meniu vizibil direct pe ecran (funcționează perfect și pe telefon)
+col_titlu, col_logout = st.columns([4, 1])
+with col_titlu:
+    st.title(f"🔧 Diagnoză Auto PRO — {st.session_state.garaj_curent}")
+with col_logout:
+    st.write("")
+    if st.button("🚪 Ieșire", use_container_width=True):
+        st.session_state.autentificat = False
+        st.session_state.garaj_curent = ""
+        st.rerun()
 
 admin_user = st.secrets.get("ADMIN_USER", "")
 optiuni_meniu = [
-    "🔍 Caută Cazuri / Istoric",
-    "📄 Import Raport PDF",
-    "➕ Adaugă Caz Manual",
+    "🔍 Caută Cazuri",
+    "📄 Import PDF",
+    "➕ Caz Manual",
     "🚗 Catalog Vehicule (BD)"
 ]
 if st.session_state.garaj_curent == admin_user:
-    optiuni_meniu.append("🛡️ Administrare Garaje")
+    optiuni_meniu.append("🛡️ Garaje")
 
-if st.session_state.pagina_curenta not in optiuni_meniu:
-    st.session_state.pagina_curenta = "🔍 Caută Cazuri / Istoric"
+cols_nav = st.columns(len(optiuni_meniu))
+for idx, opt in enumerate(optiuni_meniu):
+    with cols_nav[idx]:
+        if st.button(opt, key=f"nav_{idx}", use_container_width=True):
+            st.session_state.pagina_curenta = opt
+            st.rerun()
 
-meniu_ales = st.sidebar.radio("📌 MENIU PRINCIPAL", optiuni_meniu, index=optiuni_meniu.index(st.session_state.pagina_curenta))
-if meniu_ales != st.session_state.pagina_curenta:
-    st.session_state.pagina_curenta = meniu_ales
-    st.rerun()
-
-if st.sidebar.button("🚪 Deconectare"):
-    st.session_state.autentificat = False
-    st.session_state.garaj_curent = ""
-    st.rerun()
+st.divider()
 
 if st.session_state.mesaj_succes:
     st.toast(st.session_state.mesaj_succes, icon="✅")
     st.success(st.session_state.mesaj_succes)
     st.session_state.mesaj_succes = None
 
-if st.session_state.pagina_curenta == "🔍 Caută Cazuri / Istoric":
+# 1. PAGINA CAUTARE
+if st.session_state.pagina_curenta == "🔍 Caută Cazuri":
     toate_cazurile = supabase.table("cazuri").select("*").order("id", desc=True).execute().data
     total_cazuri = len(toate_cazurile)
     rezolvate = sum(1 for c in toate_cazurile if c.get("status") == "Rezolvat")
@@ -175,7 +174,8 @@ if st.session_state.pagina_curenta == "🔍 Caută Cazuri / Istoric":
                 if row.get("url_poza"):
                     st.image(row["url_poza"], caption="Imagine atașată", use_container_width=True)
 
-elif st.session_state.pagina_curenta == "📄 Import Raport PDF":
+# 2. PAGINA IMPORT PDF
+elif st.session_state.pagina_curenta == "📄 Import PDF":
     st.header("Import automat din raport PDF")
     pdf_incarcat = st.file_uploader("Alege raportul PDF", type=["pdf"])
     if pdf_incarcat is not None:
@@ -192,3 +192,6 @@ elif st.session_state.pagina_curenta == "📄 Import Raport PDF":
                 coduri_eroare = st.text_input("Coduri DTC (extrase automat) *", value=coduri_extrase)
                 status = st.selectbox("Status caz", ["În investigație", "Rezolvat", "Așteaptă piese"])
             simptome = st.text_area("Simptome reclamate")
+            investigatii = st.text_area("Investigații și măsurători făcute *", value="Scanare inițială efectuată (raport PDF atașat).")
+            rezolvare = st.text_area("Concluzie și Rezolvare finală")
+            poza = st.file_uploader("Atașează o poză (opțional)", type=["jpg", "jpeg", "png"])
