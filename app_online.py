@@ -41,49 +41,43 @@ import json
 
 @st.cache_data
 def incarca_date_vehicule():
-    try:
-        with zipfile.ZipFile("automobiles.csv.zip", "r") as z:
-            fisiere = [f for f in z.namelist() if f.endswith(".csv") and not f.startswith("__MACOSX")]
-            tabele = {}
-            for f in fisiere:
-                nume_scurt = f.split("/")[-1].replace(".csv", "").lower()
-                with z.open(f) as csv_file:
-                    tabele[nume_scurt] = pd.read_csv(csv_file, low_memory=False)
+    with zipfile.ZipFile("automobiles.csv.zip", "r") as z:
+        fisiere = [f for f in z.namelist() if f.endswith(".csv") and not f.startswith("__MACOSX")]
+        tabele = {}
+        for f in fisiere:
+            nume_scurt = f.split("/")[-1].replace(".csv", "").lower()
+            with z.open(f) as csv_file:
+                tabele[nume_scurt] = pd.read_csv(csv_file, low_memory=False)
 
-        if not tabele:
-            return pd.DataFrame()
-        df_auto = max(tabele.values(), key=len)
+    if not tabele:
+        return pd.DataFrame()
 
+    df_auto = max(tabele.values(), key=len)
 
-        if "brands" in tabele and "brand_id" in df_auto.columns:
-            df_b = tabele["brands"].rename(columns={"id": "brand_id", "name": "Marcă"})
-            df_auto = pd.merge(df_auto, df_b[["brand_id", "Marcă"]], on="brand_id", how="left")
+    # Legăm Marca și Modelul indiferent cum se numesc coloanele de legătură
+    if "brands" in tabele:
+        df_b = tabele["brands"]
+        col_id_b = "id" if "id" in df_b.columns else df_b.columns
+        col_nume_b = "name" if "name" in df_b.columns else df_b.columns[1]
+        if "brand_id" in df_auto.columns:
+            df_auto = pd.merge(df_auto, df_b[[col_id_b, col_nume_b]].rename(columns={col_id_b: "brand_id", col_nume_b: "Marcă"}), on="brand_id", how="left")
 
-        if "models" in tabele and "model_id" in df_auto.columns:
-            df_m = tabele["models"].rename(columns={"id": "model_id", "name": "Model"})
-            df_auto = pd.merge(df_auto, df_m[["model_id", "Model"]], on="model_id", how="left")
+    if "models" in tabele:
+        df_m = tabele["models"]
+        col_id_m = "id" if "id" in df_m.columns else df_m.columns
+        col_nume_m = "name" if "name" in df_m.columns else df_m.columns[1]
+        if "model_id" in df_auto.columns:
+            df_auto = pd.merge(df_auto, df_m[[col_id_m, col_nume_m]].rename(columns={col_id_m: "model_id", col_nume_m: "Model"}), on="model_id", how="left")
+            if "Marcă" not in df_auto.columns and "brand_id" in df_m.columns and "brands" in tabele:
+                df_b = tabele["brands"]
+                col_id_b = "id" if "id" in df_b.columns else df_b.columns
+                col_nume_b = "name" if "name" in df_b.columns else df_b.columns[1]
+                df_m_b = pd.merge(df_m[[col_id_m, "brand_id"]], df_b[[col_id_b, col_nume_b]].rename(columns={col_id_b: "brand_id", col_nume_b: "Marcă"}), on="brand_id", how="left")
+                df_auto = pd.merge(df_auto, df_m_b[[col_id_m, "Marcă"]].rename(columns={col_id_m: "model_id"}), on="model_id", how="left")
 
-        if "engine_specs" in df_auto.columns:
-            def parse_specs(val):
-                if pd.isna(val) or not str(val).strip().startswith("{"):
-                    return {}
-                try:
-                    d = json.loads(str(val))
-                    rez = {}
-                    for sectiune, continut in d.items():
-                        if isinstance(continut, dict):
-                            for k, v in continut.items():
-                                rez[k] = v
-                        else:
-                            rez[sectiune] = continut
-                    return rez
-                except Exception:
-                    return {}
+    return df_auto
 
-            specs_df = pd.json_normalize(df_auto["engine_specs"].apply(parse_specs))
-            df_auto = pd.concat([df_auto.drop(columns=["engine_specs", "photos", "url"], errors="ignore"), specs_df], axis=1)
-
-        return df_auto
+        
     except Exception:
         return pd.DataFrame()
 
@@ -297,47 +291,69 @@ elif st.session_state.pagina_curenta == "🚗 Catalog Vehicule (BD)":
         st.error("Nu s-au putut încărca datele din `automobiles.csv.zip`.")
     else:
         coloane = list(df_veh.columns)
-        
-        col_marca = "Marcă" if "Marcă" in coloane else next(iter(coloane))
-        col_model = "Model" if "Model" in coloane else next(iter(coloane[1:]), col_marca)
-
+        has_marca = "Marcă" in coloane
+        has_model = "Model" in coloane
+        col_nume_motor = "name" if "name" in coloane else ("engine_name" if "engine_name" in coloane else next(iter(coloane)))
+        col_specs = "specs" if "specs" in coloane else ("engine_specs" if "engine_specs" in coloane else None)
 
         df_filtrat = df_veh.copy()
         col_f1, col_f2, col_f3 = st.columns(3)
 
         with col_f1:
-            marci_disponibile = ["Toate mărcile"] + sorted(df_filtrat[col_marca].dropna().astype(str).unique().tolist())
-            marca_aleasa = st.selectbox("1. Alege Marca", marci_disponibile)
-            if marca_aleasa != "Toate mărcile":
-                df_filtrat = df_filtrat[df_filtrat[col_marca].astype(str) == marca_aleasa]
+            if has_marca:
+                marci = ["Toate mărcile"] + sorted(df_filtrat["Marcă"].dropna().astype(str).unique().tolist())
+                marca_aleasa = st.selectbox("1. Alege Marca", marci)
+                if marca_aleasa != "Toate mărcile":
+                    df_filtrat = df_filtrat[df_filtrat["Marcă"].astype(str) == marca_aleasa]
+            else:
+                marca_aleasa = "Toate mărcile"
+                st.info("Caută direct în câmpul 3")
 
         with col_f2:
-            modele_disponibile = ["Toate modelele"] + sorted(df_filtrat[col_model].dropna().astype(str).unique().tolist())
-            model_ales = st.selectbox("2. Alege Modelul", modele_disponibile)
-            if model_ales != "Toate modelele":
-                df_filtrat = df_filtrat[df_filtrat[col_model].astype(str) == model_ales]
+            if has_model:
+                modele = ["Toate modelele"] + sorted(df_filtrat["Model"].dropna().astype(str).unique().tolist())
+                model_ales = st.selectbox("2. Alege Modelul", modele)
+                if model_ales != "Toate modelele":
+                    df_filtrat = df_filtrat[df_filtrat["Model"].astype(str) == model_ales]
+            else:
+                model_ales = "Toate modelele"
 
         with col_f3:
-            cautare_motor = st.text_input("3. Caută motor / cilindree / an", placeholder="ex: 2.0 TDI, 110 kw, 2015")
+            cautare_motor = st.text_input("3. Caută motor / cilindree / model", placeholder="ex: 1.9 TDI, 2.0, Golf, Passat")
             if cautare_motor.strip():
-                mask = df_filtrat.astype(str).apply(lambda x: x.str.contains(cautare_motor.strip(), case=False, na=False)).any(axis=1)
+                t = cautare_motor.strip()
+                cols_cautare = [c for c in ["Marcă", "Model", col_nume_motor] if c in coloane]
+                mask = df_filtrat[cols_cautare].astype(str).apply(lambda x: x.str.contains(t, case=False, na=False)).any(axis=1)
                 df_filtrat = df_filtrat[mask]
 
-        prioritare = [c for c in ["Marcă", "Model", "engine_name", "name"] if c in coloane]
-        coloane_ordonate = prioritare + [c for c in coloane if c not in prioritare + ["id", "brand_id", "model_id", "url", "photos", "other_id", "automobile_id", "created_at", "updated_at"]]
-        df_afisat = df_filtrat[coloane_ordonate]
+        st.markdown(f"**Motorizări găsite:** `{len(df_filtrat)}` înregistrări (se afișează primele 30)")
 
-        st.markdown(f"**Motorizări și versiuni găsite:** `{len(df_afisat)}` înregistrări")
-        st.dataframe(df_afisat.head(500), use_container_width=True, hide_index=True)
+        for _, rand in df_filtrat.head(30).iterrows():
+            titlu_part1 = f"{rand['Marcă']} {rand['Model']} — " if (has_marca and has_model and pd.notna(rand.get('Marcă'))) else ""
+            titlu_card = f"🔧 {titlu_part1}{rand[col_nume_motor]}"
+            with st.expander(titlu_card):
+                if col_specs and pd.notna(rand.get(col_specs)):
+                    try:
+                        date_specs = json.loads(str(rand[col_specs]))
+                    except Exception:
+                        try:
+                            import ast
+                            date_specs = ast.literal_eval(str(rand[col_specs]))
+                        except Exception:
+                            date_specs = {}
 
-        if len(df_afisat) == 1 or (marca_aleasa != "Toate mărcile" and model_ales != "Toate modelele" and len(df_afisat) <= 15):
-            st.subheader("📋 Fișă tehnică detaliată")
-            for _, rand in df_afisat.iterrows():
-                titlu_versiune = f"🔧 {rand[col_marca]} {rand[col_model]}" 
-                with st.expander(titlu_versiune):
-                    detalii_curate = {k: v for k, v in rand.items() if pd.notna(v) and str(v).strip() != ""}
-                    for k, v in detalii_curate.items():
-                        st.markdown(f"**{k}:** `{v}`")
+                    if isinstance(date_specs, dict) and date_specs:
+                        for sectiune, detalii in date_specs.items():
+                            st.markdown(f"#### 📌 {sectiune.replace(':', '')}")
+                            if isinstance(detalii, dict):
+                                for cheie, valoare in detalii.items():
+                                    cheie_curata = str(cheie).rstrip(":")
+                                    val_curata = str(valoare).replace("\\r\\n", " | ").replace("\r\n", " | ").replace("\n", " | ")
+                                    st.markdown(f"- **{cheie_curata}:** `{val_curata}`")
+                            else:
+                                st.write(detalii)
+                    else:
+                        st.write("Nu există detalii suplimentare.")
 
 elif st.session_state.pagina_curenta == "🛡️ Garaje":
     st.header("🛡️ Panou Administrare Garaje")
