@@ -32,19 +32,12 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-@st.cache_resource
-def init_supabase() -> Client:
-    return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
-
-import zipfile
-import json
-
 @st.cache_data
 def incarca_date_vehicule():
     baza_url = "https://githubusercontent.com"
-    df_auto = pd.read_csv("automobiles.csv.zip", compression="gzip", low_memory=False)
-    df_models = pd.read_csv(baza_url + "models.csv.zip", compression="gzip", low_memory=False)
-    df_brands = pd.read_csv(baza_url + "brands.csv.zip", compression="gzip", low_memory=False)
+    df_auto = pd.read_csv(baza_url + "automobiles.csv.zip", compression="zip", low_memory=False)
+    df_models = pd.read_csv(baza_url + "models.csv.zip", compression="zip", low_memory=False)
+    df_brands = pd.read_csv(baza_url + "brands.csv.zip", compression="zip", low_memory=False)
 
     df_models = pd.merge(
         df_models,
@@ -61,6 +54,7 @@ def incarca_date_vehicule():
     )
 
     return df_auto
+
 
 
 
