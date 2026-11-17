@@ -36,12 +36,33 @@ st.markdown("""
 def init_supabase() -> Client:
     return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
 
+import zipfile
+
 @st.cache_data
 def incarca_date_vehicule():
     try:
-        return pd.read_csv("vehicles.csv")
+        with zipfile.ZipFile("automobiles.csv.zip", "r") as z:
+            fisiere = [f for f in z.namelist() if f.endswith(".csv") and not f.startswith("__MACOSX")]
+            tabele = {}
+            for f in fisiere:
+                nume_scurt = f.split("/")[-1].replace(".csv", "").lower()
+                with z.open(f) as csv_file:
+                    tabele[nume_scurt] = pd.read_csv(csv_file, low_memory=False)
+        
+        if "brands" in tabele and "models" in tabele:
+            df_b = tabele["brands"].rename(columns={"id": "brand_id", "name": "Marcă"})
+            df_m = tabele["models"].rename(columns={"id": "model_id", "name": "Model"})
+            df_rez = pd.merge(df_m, df_b[["brand_id", "Marcă"]], on="brand_id", how="left")
+            
+            tabel_specs = next((tabele[k] for k in ["options", "engines", "specs", "trims"] if k in tabele), None)
+            if tabel_specs is not None:
+                df_rez = pd.merge(tabel_specs, df_rez[["model_id", "Marcă", "Model"]], on="model_id", how="left")
+            return df_rez
+        
+        return list(tabele.values()) if tabele else pd.DataFrame()
     except Exception:
         return pd.DataFrame()
+
 
 supabase = init_supabase()
 
