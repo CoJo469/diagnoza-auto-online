@@ -273,8 +273,10 @@ elif st.session_state.pagina_curenta == "🚗 Catalog Vehicule (BD)":
         st.error("Nu s-au putut încărca datele din `automobiles.csv.zip`.")
     else:
         coloane = list(df_veh.columns)
-        col_marca = "Marcă" if "Marcă" in coloane else next((c for c in coloane if "make" in c.lower() or "brand" in c.lower()), coloane)
-        col_model = "Model" if "Model" in coloane else next((c for c in coloane if "model" in c.lower()), coloane if len(coloane) > 1 else coloane)
+        
+        col_marca = "Marcă" if "Marcă" in coloane else next(iter(coloane))
+        col_model = "Model" if "Model" in coloane else next(iter(coloane[1:]), col_marca)
+
 
         df_filtrat = df_veh.copy()
         col_f1, col_f2, col_f3 = st.columns(3)
@@ -306,7 +308,7 @@ elif st.session_state.pagina_curenta == "🚗 Catalog Vehicule (BD)":
         if len(df_afisat) == 1 or (marca_aleasa != "Toate mărcile" and model_ales != "Toate modelele" and len(df_afisat) <= 15):
             st.subheader("📋 Fișă tehnică detaliată")
             for _, rand in df_afisat.iterrows():
-                titlu_versiune = f"🔧 {rand[col_marca]} {rand[col_model]} — {rand.iloc if len(rand) > 2 else ''}"
+                titlu_versiune = f"🔧 {rand[col_marca]} {rand[col_model]}" 
                 with st.expander(titlu_versiune):
                     detalii_curate = {k: v for k, v in rand.items() if pd.notna(v) and str(v).strip() != ""}
                     for k, v in detalii_curate.items():
